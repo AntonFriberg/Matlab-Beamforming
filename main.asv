@@ -55,13 +55,11 @@ end
 clear sample channel ctr_line_dist ctr_line_time
 
 % Number of samples to center line matrix
-% ---------------------------------------
+% ----------------------------------------
 Nbr_sample_matrix = Dist_matrix ./ (sound_vel / sample_freq);
-Nbr_sample_matrix = round(Nbr_sample_matrix);
 
-
-% Reposition data via a method called dynamic focusing
-% ----------------------------------------------------
+% Use distance matrix to reshape data by dynamic focusing
+% -------------------------------------------------------
 
 
 % load functions for dynamic receive focusing
@@ -70,7 +68,7 @@ post_focus_signal = zeros(samples, channels);
 
 for sample = 1:2048
     for channel = 1:64
-        l = 1+1;
+        l = 1+1
     end
 end
 
