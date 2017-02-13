@@ -19,43 +19,41 @@ load(char(PreRF_files(1)))
 clear PostRF_files PreRF_files
 
 % load given variables
-global signal
+global signal samples channels lines transmit_freq ...
+       sample_freq sound_vel deadzone pitch fs ft  ...
+       element_width;
 signal          = preBeamformed.Signal;
-samples         = preBeamformed.Samples
-channels        = preBeamformed.Channels
-lines           = preBeamformed.Lines
-transmit_freq   = preBeamformed.TransmittFreq
-sample_freq     = preBeamformed.SampleFreq
-sound_vel       = preBeamformed.SoundVel
-deadzone        = preBeamformed.DeadZone
-pitch           = preBeamformed.Pitch
-fs              = preBeamformed.fs
-ft              = preBeamformed.ft
-element_width   = preBeamformed.ElementWidth
+samples         = preBeamformed.Samples;
+channels        = preBeamformed.Channels;
+lines           = preBeamformed.Lines;
+transmit_freq   = preBeamformed.TransmittFreq;
+sample_freq     = preBeamformed.SampleFreq;
+sound_vel       = preBeamformed.SoundVel;
+deadzone        = preBeamformed.DeadZone;
+pitch           = preBeamformed.Pitch;
+fs              = preBeamformed.fs;
+ft              = preBeamformed.ft;
+element_width   = preBeamformed.ElementWidth;
 
 clear preBeamformed
 
-travel_distance(3, channels, element_width, ...
-                400, sample_freq, sound_vel, deadzone)
+travel_distance(3, 400)
 
 % load functions for dynamic receive focusing
 % ----------------------------------------
 
 % calculate the x position from element width and current channel
-% ch: current channel
-% nbr_ch: number of total elements
-% e_width: element width
-% return: current x pos
-function x = x_position(ch, nbr_ch, e_width)
+function x = x_position(channel)
+    global element_width channels
     % middle elements above tissue line
     % if even amounts of elements -> two middle elements
-    middle = nbr_ch / 2;
-    if ch < middle
+    middle = channels / 2;
+    if channel < middle
         % case left
-        x = e_width * (ch-middle);
-    elseif ch > middle+1
+        x = element_width * (channel-middle);
+    elseif channel > middle+1
         % case right
-        x = e_width * (ch-middle+1);
+        x = e_width * (channel-middle+1);
     else
         % otherwise on center line
         x = 0;
@@ -63,25 +61,20 @@ function x = x_position(ch, nbr_ch, e_width)
 end
 
 % calculate the y position from sample frequency and current sample
-% smp: current sample
-% smp_freq: sample frequency'
-% vel: sound velocity
-% dead_z: deadzone
-% return: current y pos
-function y = y_position(smp, smp_freq, vel, dead_z)
+function y = y_position(sample)
+    global sample_freq sound_vel deadzone
     % first calculate the sample time i.e the time between samples
-    smp_time = 1/smp_freq;
+    sample_time = 1/sample_freq;
     % add 
-    y = smp*smp_time*vel + dead_z;
+    y = sample*sample_time*sound_vel+deadzone;
 end
 
 % remember deadzone elements!
 
 % calculate the travel distance to the center line
-function td = travel_distance(ch, nbr_ch, e_width, ...
-                              smp, smp_freq, vel, dead_z)
-    x = x_position(ch, nbr_ch, e_width);
-    y = y_position(smp, smp_freq, vel, dead_z);
+function td = travel_distance(channel, sample)
+    x = x_position(channel);
+    y = y_position(sample);
     td = sqrt(x^2 + y^2);
 end
 
