@@ -22,7 +22,7 @@ function Post_beamform = beamform(preBeamformed)
     clear preBeamformed
 
     % Generate listening depth matrix
-    % --------------------------------------------------
+    % -------------------------------
     Depth_matrix = listening_depths();
     
     % Number of samples to the part of the center line we are listening
@@ -74,7 +74,7 @@ function Post_beamform = beamform(preBeamformed)
         % calculate the distance travelled by the echo received from center focus
         function dist = echo_distance(sample)
             % first calculate the sample time i.e the time between samples
-            sample_time = 1/sample_freq;
+            sample_time = 1/sample_freq; % should add a 2 here
             % add
             dist = sample*sample_time*sound_vel;
         end
