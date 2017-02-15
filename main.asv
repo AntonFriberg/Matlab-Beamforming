@@ -76,12 +76,16 @@ for sample = 1:samples
         % distance to place on center line we are listening in number of
         % samples
         center_sample_depth = Nbr_sample_matrix(sample, channel);
-        if center_sample_depth <= samples
+        % check if inside listening window
+        if (center_sample_depth <= samples) && ...
+           (center_sample_depth ~= 0) && ...
+           
+            
+            if
+        %if inside_listening_window(center_sample_depth)
             for line = 1:lines
                 value = signal(sample, channel, line);
-                if center_sample_depth ~= 0
-                    post_focus_signal(center_sample_depth, channel, line) = value;
-                end  
+                post_focus_signal(center_sample_depth, channel, line) = value;
             end
         end
     end
@@ -101,14 +105,16 @@ for channel = 1:samples
         merged_channel_signal(channel, line) = sum(apodization_array);
     end
 end
+
 cutoff_freq = 1000000;
 butter_param = cutoff_freq / (sample_freq/2);
-[B,A] = butter(10, 0.04, 'high');
+
+[B,A] = butter(10, butter_param, 'high');
 data = filtfilt(B, A, merged_channel_signal);
 image_data = abs(hilbert(data));
 figure;
-imagesc(image_data);
-colormap(gray)
+imagesc(image_data);colormap(gray)
+title('preBeamformed image')
 
 % load functions for dynamic receive focusing
 % -------------------------------------------
@@ -162,3 +168,31 @@ function return_array = apodization(linear_array)
     return_array = linear_array.*scaling_array;
     
 end
+
+% check if current sample and channel is inside the listening window
+function b = inside_listening_window(center_sample_depth)
+    global samples
+    b = (center_sample_depth <= samples) & (center_sample_depth ~= 0);
+end
+
+% Dynamic apperature
+function b = valid_channel(sample, channel)
+    global deadzone
+    x = distance_from_center(channel);
+    y = listening_depth(sample, channel) - deadzone;
+    b = x < y;
+end
+
+% Determine if current value is from a valid echo
+function valid = valid_signal_value(sample, channel, center_sample_depth)
+    if ~inside_listening_window(center_sample_depth)
+        valid = false;
+    % Dynamic apperature
+    elseif ~valid_channel(sample, channel)
+        valid = false;
+    else
+        valid = true;
+    end
+end
+        
+    

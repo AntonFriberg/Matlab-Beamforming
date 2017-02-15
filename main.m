@@ -55,8 +55,8 @@ end
 % remove from workspace
 clear sample channel depth time
 
-% Number of samples to center line matrix
-% ---------------------------------------
+% Number of samples to the part of the center line we are listening
+% -----------------------------------------------------------------
 Nbr_sample_matrix = Dist_matrix ./ (sound_vel / sample_freq);
 Nbr_sample_matrix = round(Nbr_sample_matrix);
 
@@ -76,12 +76,11 @@ for sample = 1:samples
         % distance to place on center line we are listening in number of
         % samples
         center_sample_depth = Nbr_sample_matrix(sample, channel);
-        if center_sample_depth <= samples
+        % check if inside listening window
+        if (center_sample_depth <= samples) && (center_sample_depth ~= 0)
             for line = 1:lines
                 value = signal(sample, channel, line);
-                if center_sample_depth ~= 0
-                    post_focus_signal(center_sample_depth, channel, line) = value;
-                end  
+                post_focus_signal(center_sample_depth, channel, line) = value;
             end
         end
     end
@@ -109,8 +108,8 @@ butter_param = cutoff_freq / (sample_freq/2);
 data = filtfilt(B, A, merged_channel_signal);
 image_data = abs(hilbert(data));
 figure;
-imagesc(image_data);
-colormap(gray)
+imagesc(image_data);colormap(gray)
+title('preBeamformed image')
 
 % load functions for dynamic receive focusing
 % -------------------------------------------
@@ -151,7 +150,13 @@ function ld = listening_depth(sample, channel)
     center_dist = distance_from_center(channel);
     echo_dist = echo_distance(sample);
     if echo_dist >= center_dist
-        ld = sqrt(echo_dist^2 - center_dist^2) + deadzone;
+        depth = sqrt(echo_dist^2 - center_dist^2) + deadzone;
+        % dynamic apperature with F = 0.5
+        if depth >= center_dist
+            ld = depth;
+        else
+            ld = 0;
+        end
     else
         ld = 0;
     end
@@ -162,5 +167,8 @@ function return_array = apodization(linear_array)
     l = length(linear_array);
     scaling_array = -1 * linspace(-0.95, 0.95, l).^2 + 1;
     return_array = linear_array.*scaling_array;
-    
 end
+
+
+        
+    
