@@ -1,5 +1,5 @@
 function Image_data = filter_transform( Post_beamform )
-%FILTER_TRANSFORM Summary of this function goes here
+%filter_transform Performs high-pas filter and hilbert transform
 %   Detailed explanation goes here
 
     Post_high_pass = butter_filter(Post_beamform);

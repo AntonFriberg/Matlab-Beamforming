@@ -1,6 +1,5 @@
 function Post_beamform = beamform(preBeamformed)
-%FUNCTION1 Summary of this function goes here
-%   Detailed explanation goes here
+%beamform applies delays and merges channel data into singel line
 
     % load given variables
     global signal samples channels lines transmit_freq ...
