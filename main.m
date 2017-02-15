@@ -16,7 +16,7 @@ for i = 1:length(PostRF_files)
     name = sprintf('Filtering from PostRF %d', i);
     title(name)
     filename = sprintf('output/filtering_PostRF%d', i);
-    saveas(gcf, filename, 'bmp')
+    saveas(gcf, filename, 'png')
 end
 
 % PreRF files
@@ -31,7 +31,7 @@ for i = 1:length(PreRF_files)
     name = sprintf('Beamforming and filtering from PreRF %d', i);
     title(name)
     filename = sprintf('output/beam_filt_PreRF_%d', i);
-    print(filename,'-dpng') 
+    saveas(gcf, filename, 'png')
 end
 
 
