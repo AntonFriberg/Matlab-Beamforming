@@ -41,134 +41,154 @@ clear preBeamformed
 
 % Generate listening depth matrix
 % --------------------------------------------------
-Dist_matrix = zeros(samples, channels);
-Time_matrix = zeros(samples, channels);
-
-for sample = 1:samples
-    for channel = 1:channels
-        depth = listening_depth(sample, channel);
-        time = depth / sound_vel;
-        Dist_matrix(sample, channel) = depth;
-        Time_matrix(sample, channel) = time;
-    end
-end
-% remove from workspace
-clear sample channel depth time
+Depth_matrix = listening_depths();
 
 % Number of samples to the part of the center line we are listening
 % -----------------------------------------------------------------
-Nbr_sample_matrix = Dist_matrix ./ (sound_vel / sample_freq);
-Nbr_sample_matrix = round(Nbr_sample_matrix);
+Depth_sample_matrix = depth_to_samples(Depth_matrix);
+
+% Dynamic focus via repositioning of signals
+% ------------------------------------------
+Post_focus_signal = focus_signal(Depth_sample_matrix);
+
+% Merge all channels into scan lines and apply apodization
+% ---------------------------------------------------------
+Post_beamform = Beamform(Post_focus_signal);
 
 
-% Reposition data via a method called dynamic focusing
-% ----------------------------------------------------
-% make sure to add dynamic apperature here later
-% New matrix that our signal values will be placed
-post_focus_signal = zeros(samples, channels, lines);
-% remove from workspace
-clear dz_samples
+%time_gain_compensated = time_gain_compensation(merged_channel_signal);
 
-% place signal value into correct position given by distance to
-% center line
-for sample = 1:samples
-    for channel = 1:channels
-        % distance to place on center line we are listening in number of
-        % samples
-        center_sample_depth = Nbr_sample_matrix(sample, channel);
-        % check if inside listening window
-        if (center_sample_depth <= samples) && (center_sample_depth ~= 0)
-            for line = 1:lines
-                value = signal(sample, channel, line);
-                post_focus_signal(center_sample_depth, channel, line) = value;
-            end
-        end
-    end
-end
-% remove from workspace
-clear sample channel line center_sample_depth;
+Post_high_pass = butter_filter(Post_beamform);
 
-% Merge all samples of different channels
-% ---------------------------------------
-% this is the place to perform apodization later
-merged_channel_signal = zeros(samples, lines);
-for channel = 1:samples
-    for line = 1:lines
-        linear_array = post_focus_signal(channel, 1:end, line);
-        % apodization
-        apodization_array = apodization(linear_array);
-        merged_channel_signal(channel, line) = sum(apodization_array);
-    end
-end
-
-cutoff_freq = 1000000;
-butter_param = cutoff_freq / (sample_freq/2);
-
-[B,A] = butter(10, butter_param, 'high');
-data = filtfilt(B, A, merged_channel_signal);
-image_data = abs(hilbert(data));
+Image_data = hilbert_transform(Post_high_pass);
 figure;
-imagesc(image_data);colormap(gray)
+imagesc(Image_data);colormap(gray)
 title('preBeamformed image')
 
 % load functions for dynamic receive focusing
 % -------------------------------------------
 
-% calculate the current elements distance from the center element
-function dist = distance_from_center(channel)
-    global element_width channels
-    % middle elements above tissue line
-    % if even amounts of elements -> two middle elements
-    middle = channels / 2;
-    if channel < middle
-        % case left
-        dist = element_width * (middle-channel);
-    elseif channel > middle+1
-        % case right
-        dist = element_width * (channel-(middle+1));
-    else
-        % otherwise on center line
-        dist = 0;
+function Depth_matrix = listening_depths()
+    global samples channels sound_vel ...
+           element_width sample_freq deadzone
+    % Generate empty
+    Depth_matrix = zeros(samples, channels);
+    
+    for sample = 1:samples
+        for channel = 1:channels
+            depth = listening_depth(sample, channel);
+            time = depth / sound_vel;
+            Depth_matrix(sample, channel) = depth;
+        end
     end
-end
+    
+    
+    % calculate the current elements distance from the center element
+    function dist = distance_from_center(channel)
+        % middle elements above tissue line
+        % if even amounts of elements -> two middle elements
+        middle = channels / 2;
+        if channel < middle
+            % case left
+            dist = element_width * (middle-channel);
+        elseif channel > middle+1
+            % case right
+            dist = element_width * (channel-(middle+1));
+        else
+            % otherwise on center line
+            dist = 0;
+        end
+    end
 
-% calculate the distance travelled by the echo received from center focus
-function dist = echo_distance(sample)
-    global sample_freq sound_vel
-    % first calculate the sample time i.e the time between samples
-    sample_time = 1/sample_freq;
-    % add 
-    dist = sample*sample_time*sound_vel;
-end
+    % calculate the distance travelled by the echo received from center focus
+    function dist = echo_distance(sample)
+        % first calculate the sample time i.e the time between samples
+        sample_time = 1/sample_freq;
+        % add
+        dist = sample*sample_time*sound_vel;
+    end
 
-% remember deadzone elements!
+    % remember deadzone elements!
 
-% calculate where on the center line we are listening
-% 0 if outside listening window
-function ld = listening_depth(sample, channel)
-    global deadzone
-    center_dist = distance_from_center(channel);
-    echo_dist = echo_distance(sample);
-    if echo_dist >= center_dist
-        depth = sqrt(echo_dist^2 - center_dist^2) + deadzone;
-        % dynamic apperature with F = 0.5
-        if depth >= center_dist
-            ld = depth;
+    % calculate where on the center line we are listening
+    % 0 if outside listening window
+    function ld = listening_depth(sample, channel)
+        center_dist = distance_from_center(channel);
+        echo_dist = echo_distance(sample);
+        if echo_dist >= center_dist
+            depth = sqrt(echo_dist^2 - center_dist^2) + deadzone;
+            % dynamic apperature with F = 0.5
+            if depth >= center_dist
+                ld = depth;
+            else
+                ld = 0;
+            end
         else
             ld = 0;
         end
-    else
-        ld = 0;
+    end
+    
+end
+
+function Depth_sample_matrix = depth_to_samples(Depth_matrix)
+    global sound_vel sample_freq
+    Depth_sample_matrix = round(Depth_matrix ./ (sound_vel/sample_freq));
+end
+
+function Post_focus = focus_signal(Depth_sample_matrix)
+    global samples channels lines signal
+    Post_focus = zeros(samples, channels, lines);
+    
+    % place signal value into correct position given by distance to
+    % center line
+    for sample = 1:samples
+        for channel = 1:channels
+            % distance to place on center line we are listening in number of
+            % samples
+            center_depth = Depth_sample_matrix(sample, channel);
+            % check if inside listening window
+            if (center_depth<=samples) && (center_depth ~= 0)
+                for line = 1:lines
+                    value = signal(sample, channel, line);
+                    Post_focus(center_depth, channel, line) = value;
+                end
+            end
+        end
     end
 end
 
-% apodization of an array
-function return_array = apodization(linear_array)
-    l = length(linear_array);
-    scaling_array = -1 * linspace(-0.95, 0.95, l).^2 + 1;
-    return_array = linear_array.*scaling_array;
+function Post_beamform = Beamform(Post_focus_signal)
+    global samples lines
+    
+    Post_beamform = zeros(samples, lines);
+    
+    for sample = 1:samples
+        for line = 1:lines
+            pre_merged = Post_focus_signal(sample, 1:end, line);
+            post_apodization = apodization(pre_merged);
+            Post_beamform(sample, line) = sum(post_apodization);
+        end
+    end
+    
+    % apodization of an array
+    function output = apodization(input)
+        l = length(input);
+        weights = -1 * linspace(-0.95, 0.95, l).^2 + 1;
+        output = input .* weights;
+    end
 end
 
+function Post_high_pass = butter_filter(Post_beamform)
+    global sample_freq
+    cutoff_freq = 1000000;
+    butter_param = cutoff_freq / (sample_freq/2);
+    % Butterworthfilter 'high pass'
+    [B,A] = butter(10, butter_param, 'high');
+    Post_high_pass = filtfilt(B, A, Post_beamform);
+end
 
+function Image_data = hilbert_transform(Post_high_pass)
+    Image_data = abs(hilbert(Post_high_pass));
+end
         
     
